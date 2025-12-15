@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel de Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f2f2f2;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+.container{
+    background:#fff;
+    width:100%;
+    max-width:420px;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+h2{text-align:center;}
+input, button{
+    width:100%;
+    padding:10px;
+    margin:5px 0;
+}
+button{
+    background:#007bff;
+    color:#fff;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+button:hover{opacity:0.9;}
+.link{text-align:center;color:#007bff;cursor:pointer;}
+.hidden{display:none;}
+.card{border:1px solid #ddd;padding:10px;border-radius:8px;margin:8px 0;}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginBox">
+<h2>Login</h2>
+<input id="loginUser" placeholder="Usuário">
+<input id="loginPass" type="password" placeholder="Senha">
+<button id="btnLogin">Entrar</button>
+<div class="link" id="btnShowRegister">Criar nova conta</div>
+</div>
+
+<!-- REGISTRO -->
+<div id="registerBox" class="hidden">
+<h2>Criar Conta</h2>
+<input id="regUser" placeholder="Novo usuário">
+<input id="regPass" type="password" placeholder="Nova senha">
+<button id="btnRegister">Cadastrar</button>
+<div class="link" id="btnShowLogin">Voltar para login</div>
+</div>
+
+<!-- LOJA -->
+<div id="shopBox" class="hidden">
+<h2>Lojinha 🛒</h2>
+<p id="welcomeUser"></p>
+<p id="diamondInfo"></p>
+<div class="card">
+<b>Spotify Premium</b><br>
+Preço: <b>10 💎</b><br><br>
+<button onclick="buySpotify()">Comprar</button>
+</div>
+<br>
+<button onclick="logout()">Sair</button>
+</div>
+
+<!-- ADMIN -->
+<div id="adminBox" class="hidden">
+<h2>Painel Admin</h2>
+<div id="userList"></div>
+<button onclick="logout()">Sair</button>
+</div>
+
+</div>
+
+<script>
+// ---------- SETUP ----------
+if(!localStorage.getItem('users')){
+    localStorage.setItem('users', JSON.stringify([
+        { user:'admin', pass:'123', role:'admin', diamonds:9999 }
+    ]));
+}
+
+const loginBox = document.getElementById('loginBox');
+const registerBox = document.getElementById('registerBox');
+const shopBox = document.getElementById('shopBox');
+const adminBox = document.getElementById('adminBox');
+const userList = document.getElementById('userList');
+const welcomeUser = document.getElementById('welcomeUser');
+const diamondInfo = document.getElementById('diamondInfo');
+let currentUser = null;
+
+function hideAll(){ loginBox.classList.add('hidden'); registerBox.classList.add('hidden'); shopBox.classList.add('hidden'); adminBox.classList.add('hidden'); }
+function showLogin(){ hideAll(); loginBox.classList.remove('hidden'); }
+function showRegister(){ hideAll(); registerBox.classList.remove('hidden'); }
+
+// ---------- REGISTRO ----------
+function registerUser(){
+    const u = regUser.value.trim();
+    const p = regPass.value.trim();
+    if(!u || !p) return alert('Preencha tudo');
+
+    const users = JSON.parse(localStorage.getItem('users'));
+    if(users.find(x=>x.user===u)) return alert('Usuário já existe');
+
+    const expires = Date.now() + (24 * 60 * 60 * 1000); // 1 dia
+    const newUser = { user:u, pass:p, role:'user', diamonds:0, expires };
+    users.push(newUser);
+    localStorage.setItem('users', JSON.stringify(users));
+
+    hideAll();
+    currentUser = newUser.user;
+    welcomeUser.innerText = 'Bem-vindo, ' + newUser.user;
+    diamondInfo.innerText = 'Diamantes: ' + newUser.diamonds;
+    shopBox.classList.remove('hidden');
+}
+
+// ---------- LOGIN ----------
+function login(){
+    const u = loginUser.value.trim();
+    const p = loginPass.value.trim();
+    const users = JSON.parse(localStorage.getItem('users'));
+    const found = users.find(x=>x.user===u && x.pass===p);
+    if(!found) return alert('Login inválido');
+
+    if(found.role !== 'admin' && Date.now() > found.expires){
+        alert('Conta expirada');
+        deleteUser(found.user);
+        showLogin();
+        return;
+    }
+
+    hideAll();
+    if(found.role==='admin'){
+        adminBox.classList.remove('hidden');
+        loadUsers();
+    } else {
+        currentUser = found.user;
+        welcomeUser.innerText = 'Bem-vindo, ' + found.user;
+        diamondInfo.innerText = 'Diamantes: ' + found.diamonds;
+        shopBox.classList.remove('hidden');
+    }
+}
+
+// ---------- ADMIN ----------
+function loadUsers(){
+    const users = JSON.parse(localStorage.getItem('users'));
+    userList.innerHTML='';
+
+    users.filter(u=>u.role!=='admin').forEach(u=>{
+        const div = document.createElement('div');
+        div.className='card';
+        div.innerHTML = `
+            <b>${u.user}</b><br>
+            Diamantes: ${u.diamonds}<br>
+            <input type='number' placeholder='Qtd diamantes' id='d_${u.user}'>
+            <button onclick="setDiamonds('${u.user}')">Definir 💎</button>
+            <button onclick="deleteUser('${u.user}')">Remover</button>
+        `;
+        userList.appendChild(div);
+    });
+}
+
+function setDiamonds(username){
+    const users = JSON.parse(localStorage.getItem('users'));
+    const input = document.getElementById('d_' + username);
+    const value = parseInt(input.value);
+    if(isNaN(value)) return alert('Valor inválido');
+    const user = users.find(u=>u.user===username);
+    user.diamonds = value;
+    localStorage.setItem('users', JSON.stringify(users));
+    loadUsers();
+}
+
+function deleteUser(username){
+    let users = JSON.parse(localStorage.getItem('users'));
+    users = users.filter(u=>u.user!==username);
+    localStorage.setItem('users', JSON.stringify(users));
+    loadUsers();
+}
+
+function buySpotify(){
+    const users = JSON.parse(localStorage.getItem('users'));
+    const current = users.find(u=>u.user===currentUser);
+    if(!current) return;
+
+    if(current.diamonds < 10){
+        alert('Você precisa de 10 diamantes para comprar');
+        return;
+    }
+
+    current.diamonds -= 10;
+    localStorage.setItem('users', JSON.stringify(users));
+    diamondInfo.innerText = 'Diamantes: ' + current.diamonds;
+
+    window.open('https://www.mediafire.com/file/uo4tcd39wtiwkn2/Spotifypremium.apk/file?dkey=uo4tcd39wtiwkn2','_blank');
+}
+
+function logout(){ showLogin(); }
+
+// ---------- EVENTOS ----------
+btnShowRegister.onclick = showRegister;
+btnShowLogin.onclick = showLogin;
+btnRegister.onclick = registerUser;
+btnLogin.onclick = login;
+</script>
+</body>
+</html>
